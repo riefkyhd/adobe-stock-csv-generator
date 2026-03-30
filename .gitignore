@@ -1,0 +1,15 @@
+# Local assets (do not commit)
+Portfolio/
+output/
+
+# macOS
+.DS_Store
+**/.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
