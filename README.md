@@ -113,6 +113,8 @@ Sample output view:
 
 ![Output Example](docs/images/output-example.png)
 
+This screenshot was captured from this project's generated CSV output.
+
 ## Quick Quality Check (CSV structure)
 
 ```bash
@@ -234,3 +236,5 @@ These remain public but are internal workflow aids:
 ## License
 
 MIT. See `LICENSE`.
+
+This project is independent and not affiliated with Adobe.

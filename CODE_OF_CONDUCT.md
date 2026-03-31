@@ -32,4 +32,5 @@ This Code of Conduct applies in all project spaces and also applies when an indi
 
 Report unacceptable behavior by opening a private security advisory or contacting maintainers through repository contact channels. All reports will be reviewed and investigated promptly and fairly.
 
-This policy is adapted from the Contributor Covenant, version 2.1.
+This policy is adapted from the Contributor Covenant, version 2.1:
+https://www.contributor-covenant.org/version/2/1/code_of_conduct/
