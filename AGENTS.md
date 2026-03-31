@@ -59,9 +59,13 @@ Analyze each image file and write one Adobe Stock CSV row for it using this exac
 ## Keyword rules
 
 - Most important first
-- Prefer 15–35 strong keywords unless the image clearly supports more
+- Target 20–30 strong keywords when clearly supported
+- Minimum accepted after cleanup: 15
 - Absolute maximum: 49
-- No duplicates
+- No duplicate keywords in final CSV output
+- Apply normalization + deduplication before validation and write
+- Filter out likely technical/file metadata and trademark/IP terms
+- Keep major title concepts within the top 10 keywords when relevant
 - No plural/singular spam
 - No full-sentence phrases unless it is a true fixed concept
 - Do not add speculative commercial use cases that are not visible in the image
@@ -118,10 +122,12 @@ Create a tool that:
 - loads existing CSV rows
 - skips already processed filenames
 - analyzes one image at a time
+- runs one optional keyword enrichment retry if cleaned keyword count is below 15
 - validates the generated metadata
 - appends a single valid row
 - writes failures to `output/review_needed.csv`
 - logs progress to `output/run.log`
+- records benchmark metrics (average/p50/p95/max per-image timing and throughput)
 
 ## Validation requirements
 
@@ -131,8 +137,7 @@ Before writing a row, validate:
 - title not empty
 - no comma in title
 - title length within configured limit
-- keyword count between 1 and 49
-- no duplicate keywords after normalization
+- keywords cleaned (normalize + dedupe + filter) and final count between 15 and 49
 - category in 1..21
 - release blank unless explicitly provided
 

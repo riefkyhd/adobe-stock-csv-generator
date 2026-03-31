@@ -23,11 +23,14 @@ Use this checklist before accepting a generated row.
 ### Keywords
 
 - [ ] not empty
-- [ ] <= 49 keywords
+- [ ] >= 15 keywords after cleanup (unless explicitly overridden)
+- [ ] <= 49 keywords after cleanup
 - [ ] ordered most important first
-- [ ] no duplicates
+- [ ] duplicates removed after normalization
+- [ ] major title concepts appear in top keywords when relevant
 - [ ] no irrelevant words
 - [ ] no technical metadata
+- [ ] no trademark/IP terms
 - [ ] no spammy plural/singular padding
 - [ ] same language as title
 - [ ] top 10 contain the strongest search terms
@@ -52,6 +55,7 @@ Use this checklist before accepting a generated row.
 - [ ] keyword cells remain quoted correctly when commas are present
 - [ ] no extra blank columns
 - [ ] no translated header names
+- [ ] benchmark metrics are present in `progress.json` and `run.log`
 
 ## Upload sanity checks
 

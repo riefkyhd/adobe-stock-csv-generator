@@ -69,8 +69,12 @@ Rules:
 
 - Comma-separated inside one CSV cell
 - Order by importance
+- Target 20–30 strong keywords when justified by visible content
+- Minimum accepted keyword count: 15 after cleanup
 - Max **49** keywords for this workflow
-- No duplicates
+- Duplicates are automatically removed after normalization (trim/lower/space-fold)
+- Major title concepts should be present in top keywords when relevant
+- Remove technical/file metadata and trademark/IP terms
 - No technical metadata
 - No keyword stuffing
 - Avoid unnecessary singular/plural variants

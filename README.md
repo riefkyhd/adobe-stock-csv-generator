@@ -9,6 +9,7 @@ A resumable local CLI that scans your image library and generates Adobe Stock CS
 - Deterministic scan order for consistent reruns.
 - Strict CSV contract for Adobe upload format.
 - Failure isolation: invalid/unavailable analysis logs to review file and batch continues.
+- Built-in performance benchmarking per run (avg/p50/p95/max image latency + slowest file + throughput).
 - Multiple analyzer backends:
   - `lmstudio` (default)
   - `ollama` (optional)
@@ -26,7 +27,9 @@ Rules enforced by the CLI:
 
 - UTF-8 CSV, comma delimiter, standard quoting, LF newlines.
 - `Title` required, no commas, max length guard.
-- `Keywords` required, max 49, duplicate normalization check.
+- `Keywords` required; auto-cleaned by normalization, deduplicated, filtered for compliance, and capped at 49.
+- Keyword targeting follows Adobe best practice: balanced `20-30` when justified, minimum accepted `15` after cleanup.
+- Category can be delegated to a separate LM Studio model (default `google/gemma-3-4b`) for better classification stability.
 - `Category` must be integer `1..21`.
 - `Releases` must be blank unless explicitly verified.
 
@@ -61,7 +64,7 @@ Notes:
 ## Quick Start (LM Studio default)
 
 1. Open LM Studio.
-2. Load a vision-capable model (currently using `google/gemma-3-4b`).
+2. Load a vision-capable model (recommended primary: `qwen/qwen3-vl-8b`).
 3. Start Local Server (`http://127.0.0.1:1234`).
 4. Verify:
 
@@ -75,9 +78,15 @@ curl http://127.0.0.1:1234/v1/models
 python3 src/adobe_stock_csv_cli.py \
   --backend lmstudio \
   --lmstudio-host http://127.0.0.1:1234 \
-  --lmstudio-model google/gemma-3-4b \
+  --lmstudio-model qwen/qwen3-vl-8b \
+  --lmstudio-fallback-model google/gemma-3-4b \
+  --lmstudio-category-model google/gemma-3-4b \
+  --lmstudio-timeout-seconds 120 \
+  --lmstudio-max-tokens 420 \
+  --lmstudio-top-p 0.9 \
+  --lmstudio-top-k 40 \
   --portfolio-dir Portfolio \
-  --output-dir output \
+  --output-dir output/lmstudio/qwen-qwen3-vl-8b \
   --limit 5
 ```
 
@@ -87,9 +96,15 @@ python3 src/adobe_stock_csv_cli.py \
 python3 src/adobe_stock_csv_cli.py \
   --backend lmstudio \
   --lmstudio-host http://127.0.0.1:1234 \
-  --lmstudio-model google/gemma-3-4b \
+  --lmstudio-model qwen/qwen3-vl-8b \
+  --lmstudio-fallback-model google/gemma-3-4b \
+  --lmstudio-category-model google/gemma-3-4b \
+  --lmstudio-timeout-seconds 120 \
+  --lmstudio-max-tokens 420 \
+  --lmstudio-top-p 0.9 \
+  --lmstudio-top-k 40 \
   --portfolio-dir Portfolio \
-  --output-dir output
+  --output-dir output/lmstudio/qwen-qwen3-vl-8b
 ```
 
 ## Optional Backends
@@ -124,19 +139,49 @@ Check CSV structure and print first lines:
 
 ```bash
 python3 src/adobe_stock_csv_cli.py \
-  --output-dir output \
+  --output-dir output/lmstudio/qwen-qwen3-vl-8b \
   --validate-only \
   --validate-lines 5
 ```
 
 ## Outputs
 
-Generated under `output/`:
+Generated under the selected output folder (recommended model-specific path):
 
 - `adobe_stock_upload.csv` (main upload CSV)
 - `review_needed.csv` (rows that failed analysis/validation)
 - `progress.json` (latest run counters/state)
 - `run.log` (timestamped event log)
+
+Example:
+
+- `output/lmstudio/qwen-qwen3-vl-8b/adobe_stock_upload.csv`
+
+If `--backend lmstudio` is used with default `--output-dir output`, the CLI automatically writes to:
+
+- `output/lmstudio/<model-slug>/...`
+
+## Benchmarking
+
+Each run tracks model benchmark metrics in both `progress.json` and `run.log`:
+
+- average image time
+- p50 and p95 image time
+- max (slowest) image time and filename
+- average/p95 analysis-only time
+- throughput (images/minute)
+- first-image warmup time
+
+Use these metrics to compare models (for example, Qwen vs Gemma) on the same portfolio subset.
+
+## LM Studio Tuning Notes
+
+- For this metadata workflow, do **not** max context length (`262144`); use `2048-4096` for better speed/stability.
+- The CLI can enforce API-side inference controls regardless of UI defaults:
+  - `--lmstudio-timeout-seconds`
+  - `--lmstudio-max-tokens`
+  - `--lmstudio-top-p`
+  - `--lmstudio-top-k`
 
 ## Testing
 

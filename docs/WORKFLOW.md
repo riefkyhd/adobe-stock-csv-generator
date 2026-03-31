@@ -18,7 +18,8 @@ Instead:
 6. validate metadata
 7. append one row
 8. flush file
-9. continue
+9. update benchmark metrics
+10. continue
 
 This is the most reliable strategy for long batches and matches Adobe CSV work better than a single giant one-shot run.
 
@@ -63,6 +64,10 @@ For each unprocessed image:
 - determine the main subject
 - create a short factual title
 - generate keywords ordered from general to specific, strongest first
+- normalize and deduplicate keywords before validation/write
+- filter out technical metadata and trademark/IP terms
+- if cleaned keyword count is below 15, run one enrichment retry for missing relevant terms
+- optionally run a dedicated category pass with a separate model (for example Gemma) before final validation
 - choose one numeric category
 - leave releases blank unless explicitly known
 
@@ -105,6 +110,7 @@ animal, pet, feline, domestic cat, portrait, close up, orange cat, black backgro
 ```
 
 Do not mechanically pad to 49 keywords. Adobe notes that 15–35 strong keywords are often enough, while accuracy matters more than volume. citeturn472567view2
+Use a balanced density target of 20–30 when the image clearly supports it, while preserving strict relevance.
 
 ## Title rule of thumb
 
@@ -146,8 +152,30 @@ Examples:
 /Users/administrator/Documents/Kiki/adobe_stock_csv_codex_kit/
 ├── Portfolio/
 └── output/
-    ├── adobe_stock_upload.csv
-    ├── progress.json
-    ├── review_needed.csv
-    └── run.log
+    └── lmstudio/
+        └── qwen-qwen3-vl-8b/
+            ├── adobe_stock_upload.csv
+            ├── progress.json
+            ├── review_needed.csv
+            └── run.log
 ```
+
+## Benchmarking outputs
+
+Track these per run for model comparison:
+
+- average image time
+- p50/p95 image time
+- max image time and slowest filename
+- average/p95 analysis-only time
+- throughput in images/minute
+- first-image warmup time
+
+## LM Studio runtime tuning
+
+- Keep context length practical for this task (`2048-4096`), not maximum window.
+- Use API-side controls for reproducible runs:
+  - timeout seconds
+  - max tokens
+  - top-p
+  - top-k
