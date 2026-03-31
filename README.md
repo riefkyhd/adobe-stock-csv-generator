@@ -1,19 +1,35 @@
 # Adobe Stock CSV Generator
 
-A resumable local CLI that scans your image library and generates Adobe Stock CSV metadata safely, one image at a time.
+A resumable local CLI that scans image files and builds Adobe Stock upload CSV metadata with a workflow designed for safety and restartability.
 
-## Features
+## Why This Repo
 
-- Incremental workflow: analyze `1 image -> validate -> append 1 CSV row -> flush`.
-- Resume support: skips filenames already present in output CSV.
-- Deterministic scan order for consistent reruns.
-- Strict CSV contract for Adobe upload format.
-- Failure isolation: invalid/unavailable analysis logs to review file and batch continues.
-- Built-in performance benchmarking per run (avg/p50/p95/max image latency + slowest file + throughput).
-- Multiple analyzer backends:
-  - `lmstudio` (default)
-  - `ollama` (optional)
-  - `openai` (optional)
+This project focuses on workflow safety, not one-shot AI generation:
+
+- Row-by-row processing: `analyze 1 image -> validate -> append 1 row -> flush -> continue`
+- Resume/recovery guarantees: reruns skip filenames already in CSV
+- Strict validation before write: title/keywords/category/release checks enforced
+- Review queue for uncertain/invalid rows: failures go to `review_needed.csv` without stopping batch
+- Benchmark visibility: run-level latency/throughput stats in `progress.json` and `run.log`
+- Deterministic scan order for reproducible reruns
+
+## What This Repo Does Not Do
+
+- It does **not** guarantee perfect metadata accuracy.
+- It does **not** guarantee perfect category assignment for every image.
+- It does **not** replace human review before Adobe submission.
+- It does **not** bypass Adobe policy requirements.
+
+Human review is still expected for final acceptance quality.
+
+## Project Maturity
+
+Current maturity signals:
+
+- Unit tests for resume, validation, collisions, fallback behavior, and CSV structure checks
+- CI runs tests plus packaging/install smoke checks
+- Local+packaged CLI entry points supported
+- Strict Adobe CSV contract enforcement
 
 ## CSV Contract
 
@@ -25,42 +41,45 @@ Filename,Title,Keywords,Category,Releases
 
 Rules enforced by the CLI:
 
-- UTF-8 CSV, comma delimiter, standard quoting, LF newlines.
-- `Title` required, no commas, max length guard.
-- `Keywords` required; auto-cleaned by normalization, deduplicated, filtered for compliance, and capped at 49.
-- Keyword targeting follows Adobe best practice: balanced `20-30` when justified, minimum accepted `15` after cleanup.
-- Place names are generalized by default (avoid specific city/country names unless externally verified).
-- Category can be delegated to a separate LM Studio model (default `google/gemma-3-4b`) for better classification stability.
-- `Category` must be integer `1..21`.
-- `Releases` must be blank unless explicitly verified.
+- UTF-8 CSV, comma delimiter, standard quoting, LF newlines
+- `Title` required, no commas, max length guard
+- `Keywords` cleaned/deduplicated/filtered and capped at 49
+- Category must be numeric `1..21`
+- `Releases` blank unless explicitly verified
 
-## Project Structure
+## Installation
 
-```text
-adobe-stock-csv-generator/
-├── docs/
-├── prompts/
-├── src/
-│   └── adobe_stock_csv_cli.py
-├── tests/
-│   └── test_adobe_stock_csv_cli.py
-├── AGENTS.md
-└── README.md
+### Option A: Local install with pip
+
+```bash
+python3 -m pip install .
 ```
 
-Notes:
+Then run:
 
-- `Portfolio/` is your local image library and is intentionally excluded from Git.
-- `output/` contains generated run artifacts and is intentionally excluded from Git.
+```bash
+adobe-stock-csv --help
+```
 
-## Requirements
+### Option B: Isolated install with pipx (recommended for CLI usage)
 
-- Python 3.10+
-- macOS/Linux terminal
-- One analyzer backend:
-  - LM Studio local server (recommended), or
-  - Ollama local server, or
-  - OpenAI API key
+```bash
+pipx install .
+```
+
+Then run:
+
+```bash
+adobe-stock-csv --help
+```
+
+## Backward-Compatible Direct Script Usage
+
+Direct script execution remains supported:
+
+```bash
+python3 src/adobe_stock_csv_cli.py --help
+```
 
 ## Quick Start (LM Studio default)
 
@@ -73,73 +92,53 @@ Notes:
 curl http://127.0.0.1:1234/v1/models
 ```
 
-5. Run smoke test:
+Smoke test:
 
 ```bash
-python3 src/adobe_stock_csv_cli.py \
+adobe-stock-csv \
   --backend lmstudio \
   --lmstudio-host http://127.0.0.1:1234 \
   --lmstudio-model qwen/qwen3-vl-8b \
   --lmstudio-fallback-model google/gemma-3-4b \
   --lmstudio-category-model google/gemma-3-4b \
-  --lmstudio-timeout-seconds 120 \
-  --lmstudio-max-tokens 420 \
-  --lmstudio-top-p 0.9 \
-  --lmstudio-top-k 40 \
   --portfolio-dir Portfolio \
   --output-dir output/lmstudio/qwen-qwen3-vl-8b \
   --limit 5
 ```
 
-6. Run full batch:
+Full run:
 
 ```bash
-python3 src/adobe_stock_csv_cli.py \
+adobe-stock-csv \
   --backend lmstudio \
   --lmstudio-host http://127.0.0.1:1234 \
   --lmstudio-model qwen/qwen3-vl-8b \
   --lmstudio-fallback-model google/gemma-3-4b \
   --lmstudio-category-model google/gemma-3-4b \
-  --lmstudio-timeout-seconds 120 \
-  --lmstudio-max-tokens 420 \
-  --lmstudio-top-p 0.9 \
-  --lmstudio-top-k 40 \
   --portfolio-dir Portfolio \
   --output-dir output/lmstudio/qwen-qwen3-vl-8b
 ```
 
-## Optional Backends
+## Lightweight Fixture for Contributor Validation
 
-### Ollama
+A tiny fixture is included at `fixtures/minimal/` for onboarding and plumbing checks.
+
+Example:
 
 ```bash
-ollama serve
-ollama pull qwen3.5:2b-fast
-python3 src/adobe_stock_csv_cli.py \
-  --backend ollama \
-  --ollama-model qwen3.5:2b-fast \
-  --portfolio-dir Portfolio \
-  --output-dir output
+adobe-stock-csv \
+  --portfolio-dir fixtures/minimal \
+  --output-dir /tmp/adobe-stock-csv-fixture-run \
+  --limit 1 \
+  --dry-run
 ```
 
-### OpenAI
+This is for wiring validation only. Use real image sets for metadata quality evaluation.
+
+## Validate Existing CSV Structure
 
 ```bash
-export OPENAI_API_KEY="your_key"
-export OPENAI_MODEL="gpt-4.1-mini"
-python3 src/adobe_stock_csv_cli.py \
-  --backend openai \
-  --model "$OPENAI_MODEL" \
-  --portfolio-dir Portfolio \
-  --output-dir output
-```
-
-## Validation Command
-
-Check CSV structure and print first lines:
-
-```bash
-python3 src/adobe_stock_csv_cli.py \
+adobe-stock-csv \
   --output-dir output/lmstudio/qwen-qwen3-vl-8b \
   --validate-only \
   --validate-lines 5
@@ -147,60 +146,32 @@ python3 src/adobe_stock_csv_cli.py \
 
 ## Outputs
 
-Generated under the selected output folder (recommended model-specific path):
+Generated under selected output dir:
 
-- `adobe_stock_upload.csv` (main upload CSV)
-- `review_needed.csv` (rows that failed analysis/validation)
-- `progress.json` (latest run counters/state)
-- `run.log` (timestamped event log)
+- `adobe_stock_upload.csv`
+- `review_needed.csv`
+- `progress.json`
+- `run.log`
 
-Example:
+## Optional Backends
 
-- `output/lmstudio/qwen-qwen3-vl-8b/adobe_stock_upload.csv`
-
-If `--backend lmstudio` is used with default `--output-dir output`, the CLI automatically writes to:
-
-- `output/lmstudio/<model-slug>/...`
-
-## Benchmarking
-
-Each run tracks model benchmark metrics in both `progress.json` and `run.log`:
-
-- average image time
-- p50 and p95 image time
-- max (slowest) image time and filename
-- average/p95 analysis-only time
-- throughput (images/minute)
-- first-image warmup time
-
-Use these metrics to compare models (for example, Qwen vs Gemma) on the same portfolio subset.
-
-## LM Studio Tuning Notes
-
-- For this metadata workflow, do **not** max context length (`262144`); use `2048-4096` for better speed/stability.
-- The CLI can enforce API-side inference controls regardless of UI defaults:
-  - `--lmstudio-timeout-seconds`
-  - `--lmstudio-max-tokens`
-  - `--lmstudio-top-p`
-  - `--lmstudio-top-k`
+- `lmstudio` (default)
+- `ollama`
+- `openai`
 
 ## Testing
-
-Run tests:
 
 ```bash
 python3 -m unittest -q tests/test_adobe_stock_csv_cli.py
 ```
 
-## Safety + Resume Behavior
+## Internal Maintainer Docs
 
-- The CLI never rewrites the CSV on each iteration.
-- Each successful row is appended and flushed immediately.
-- Reruns are safe: existing filenames are skipped automatically.
-- Failures are logged and do not stop the whole batch.
+These remain public but are maintainer/internal workflow aids, not end-user runtime requirements:
 
-## Troubleshooting
+- `AGENTS.md`
+- `prompts/`
 
-- If LM Studio crashes when invoked by CLI tooling, open LM Studio manually and keep server running.
-- If `curl http://127.0.0.1:1234/v1/models` fails, restart Local Server in LM Studio.
-- If using LAN host and it fails but localhost works, LM Studio is likely bound to localhost only.
+## License
+
+MIT. See `LICENSE`.

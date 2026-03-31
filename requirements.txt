@@ -1,0 +1,2 @@
+# Convenience install file. Source of truth remains pyproject.toml.
+.
