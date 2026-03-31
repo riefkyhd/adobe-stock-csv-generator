@@ -18,6 +18,7 @@ from src.adobe_stock_csv_cli import (
     quick_validate_csv_structure,
     run_batch,
     sanitize_keywords,
+    sanitize_title_text,
     resolve_output_dir,
 )
 
@@ -290,7 +291,7 @@ class AdobeStockCsvCliTests(unittest.TestCase):
                 rows = list(csv.reader(fp))
             # Duplicates should be auto-cleaned while keeping a valid keyword set.
             keywords = [k.strip() for k in rows[1][2].split(",") if k.strip()]
-            self.assertIn("Leaf", keywords)
+            self.assertIn("leaf", [k.lower() for k in keywords])
             self.assertNotIn("leaf", keywords[1:])  # first normalized term kept, repeats removed
             self.assertGreaterEqual(len(keywords), 15)
 
@@ -423,6 +424,66 @@ class AdobeStockCsvCliTests(unittest.TestCase):
         self.assertEqual(keywords[0].lower(), "waterfall")
         self.assertIn("sunset", [k.lower() for k in keywords[:3]])
         self.assertIn("forest", [k.lower() for k in keywords[:4]])
+
+    def test_location_terms_are_removed_from_keywords(self):
+        keywords = sanitize_keywords(
+            [
+                "Thailand traffic",
+                "Bangkok street",
+                "urban road",
+                "vehicle",
+                "city transport",
+                "commute",
+                "street light",
+                "car",
+                "road",
+                "public transport",
+                "outdoor",
+                "daylight",
+                "city life",
+                "mobility",
+                "transportation",
+            ],
+            title="Traffic scene in Thailand",
+        )
+        lowered = [k.lower() for k in keywords]
+        self.assertIn("traffic", lowered)
+        self.assertIn("street", lowered)
+        self.assertNotIn("thailand", " ".join(lowered))
+        self.assertNotIn("bangkok", " ".join(lowered))
+
+    def test_location_terms_are_removed_from_title(self):
+        cleaned = sanitize_title_text("Thailand traffic in Bangkok")
+        self.assertEqual(cleaned.lower(), "traffic")
+
+    def test_non_ascii_keywords_are_removed(self):
+        keywords = sanitize_keywords(
+            [
+                "mosque",
+                "伊斯兰建筑",
+                "architecture",
+                "twilight",
+                "minaret",
+                "religious building",
+                "skyline",
+                "sunset",
+                "cityscape",
+                "landmark",
+                "exterior",
+                "historic",
+                "tower",
+                "culture",
+                "travel",
+            ],
+            title="Mosque minaret at twilight",
+        )
+        merged = " ".join(keywords)
+        self.assertNotIn("伊斯兰", merged)
+        self.assertGreaterEqual(len(keywords), 10)
+
+    def test_non_ascii_title_is_cleaned(self):
+        cleaned = sanitize_title_text("Minaret 伊斯兰建筑 at twilight")
+        self.assertEqual(cleaned, "Minaret at twilight")
 
     def test_low_keyword_count_uses_enrichment_retry(self):
         class EnrichingAnalyzer:

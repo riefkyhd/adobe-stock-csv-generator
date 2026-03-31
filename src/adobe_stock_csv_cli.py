@@ -97,6 +97,87 @@ BLOCKED_IP_KEYWORDS = {
     "youtube",
 }
 
+# Keep metadata generally marketable and avoid unverifiable geo-specific claims.
+LOCATION_PHRASES = {
+    "abu dhabi",
+    "bali indonesia",
+    "bangkok thailand",
+    "hong kong",
+    "kuala lumpur",
+    "los angeles",
+    "new york",
+    "new york city",
+    "san francisco",
+    "saudi arabia",
+    "singapore city",
+    "united arab emirates",
+    "united kingdom",
+    "united states",
+    "west java",
+}
+
+LOCATION_TERMS = {
+    "africa",
+    "algeria",
+    "america",
+    "argentina",
+    "asia",
+    "australia",
+    "austria",
+    "bali",
+    "bangkok",
+    "belgium",
+    "brazil",
+    "canada",
+    "china",
+    "colombia",
+    "denmark",
+    "dubai",
+    "egypt",
+    "england",
+    "europe",
+    "france",
+    "germany",
+    "greece",
+    "india",
+    "indonesia",
+    "iran",
+    "iraq",
+    "ireland",
+    "italy",
+    "jakarta",
+    "japan",
+    "jeddah",
+    "jordan",
+    "korea",
+    "kuwait",
+    "london",
+    "malaysia",
+    "mexico",
+    "morocco",
+    "netherlands",
+    "norway",
+    "pakistan",
+    "paris",
+    "philippines",
+    "qatar",
+    "russia",
+    "saudi",
+    "singapore",
+    "spain",
+    "sweden",
+    "switzerland",
+    "thailand",
+    "tokyo",
+    "turkey",
+    "uae",
+    "uk",
+    "usa",
+    "vietnam",
+}
+
+NON_ASCII_PATTERN = re.compile(r"[^\x00-\x7F]")
+
 
 class ValidationError(Exception):
     """Raised when generated metadata is invalid."""
@@ -162,6 +243,7 @@ class OpenAIVisionAnalyzer:
                         "category (integer 1-21), releases (string). "
                         "Use English only. Title must be factual, no commas, <= 70 chars preferred. "
                         "No brands, logos, trademarks, copyrighted character names, or camera metadata. "
+                        "Avoid specific city, country, or landmark names unless externally verified; use general location terms. "
                         "Keywords must be relevant, ordered most important first, max 49, no duplicates. "
                         "Keep releases empty unless explicitly verified. "
                         "Category mapping hints: animals=1, architecture/interiors=2, drinks=4, food=7, "
@@ -247,6 +329,7 @@ class OllamaVisionAnalyzer:
                         "category (integer 1-21), releases (string). "
                         "Use English only. Title must be factual, no commas, <= 70 chars preferred. "
                         "No brands, logos, trademarks, copyrighted character names, or camera metadata. "
+                        "Avoid specific city, country, or landmark names unless externally verified; use general location terms. "
                         "Keywords must be relevant, ordered most important first, max 49, no duplicates. "
                         "Keep releases empty unless explicitly verified. "
                         "Category mapping hints: animals=1, architecture/interiors=2, drinks=4, food=7, "
@@ -370,6 +453,7 @@ class LMStudioVisionAnalyzer:
                         "category (integer 1-21), releases (string). "
                         "Use English only. Title must be factual, no commas, <= 70 chars preferred. "
                         "No brands, logos, trademarks, copyrighted character names, or camera metadata. "
+                        "Avoid specific city, country, or landmark names unless externally verified; use general location terms. "
                         "Keywords must be relevant, buyer-focused, and ordered by importance from strongest first. "
                         f"Target {TARGET_KEYWORD_LOW}-{TARGET_KEYWORD_HIGH} keywords when justified by visible content; "
                         f"hard max {MAX_KEYWORDS}. Avoid keyword spam and duplicates. "
@@ -422,7 +506,8 @@ class LMStudioVisionAnalyzer:
                         "Generate only missing, relevant keywords that are not duplicates of existing terms. "
                         "Do not return title, category, or releases. "
                         f"Target final keyword list {TARGET_KEYWORD_LOW}-{TARGET_KEYWORD_HIGH}; hard max {MAX_KEYWORDS}. "
-                        "No brands, logos, trademarks, copyrighted character names, camera/exif/file metadata, or spam."
+                        "No brands, logos, trademarks, copyrighted character names, camera/exif/file metadata, or spam. "
+                        "Avoid specific city, country, or landmark names unless externally verified; keep terms general."
                     ),
                 },
                 {
@@ -827,6 +912,42 @@ def normalize_keyword(value: str) -> str:
     return cleaned
 
 
+def strip_specific_locations(value: str) -> str:
+    text = " ".join(value.strip().split())
+    if not text:
+        return ""
+
+    cleaned_text = text
+    for phrase in sorted(LOCATION_PHRASES, key=len, reverse=True):
+        cleaned_text = re.sub(
+            rf"\b{re.escape(phrase)}\b",
+            " ",
+            cleaned_text,
+            flags=re.IGNORECASE,
+        )
+
+    tokens: list[str] = []
+    for token in cleaned_text.split():
+        stripped = token.strip(" .;:-")
+        if not stripped:
+            continue
+        if stripped.lower() in LOCATION_TERMS:
+            continue
+        tokens.append(stripped)
+
+    result = " ".join(tokens)
+    result = re.sub(r"\s+", " ", result).strip(" ,.;:-")
+    return result
+
+
+def strip_non_ascii_text(value: str) -> str:
+    if not value:
+        return ""
+    cleaned = NON_ASCII_PATTERN.sub(" ", value)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    return cleaned
+
+
 def clean_keyword_display(value: str) -> str:
     cleaned = value.strip().replace("_", " ").replace("-", " ")
     cleaned = re.sub(r"\s+", " ", cleaned)
@@ -836,6 +957,8 @@ def clean_keyword_display(value: str) -> str:
 
 def keyword_is_disallowed(normalized: str, original: str) -> bool:
     if not normalized:
+        return True
+    if NON_ASCII_PATTERN.search(original):
         return True
     if normalized in GENERIC_LOW_VALUE_KEYWORDS:
         return True
@@ -865,6 +988,19 @@ def keyword_is_disallowed(normalized: str, original: str) -> bool:
     if re.fullmatch(r"\d+(?:\.\d+)?", normalized):
         return True
     return False
+
+
+def sanitize_title_text(raw_title: Any) -> str:
+    title = raw_title.strip() if isinstance(raw_title, str) else ""
+    title = title.replace("_", " ").replace("-", " ")
+    title = re.sub(r"\s+", " ", title).strip()
+    title = strip_specific_locations(title)
+    title = strip_non_ascii_text(title)
+    title = re.sub(r"\s+", " ", title).strip(" ,.;:-")
+
+    # Remove dangling prepositions after location stripping.
+    title = re.sub(r"\b(in|at|from|near|around|across|within|inside|outside)\s*$", "", title).strip()
+    return title
 
 
 def extract_title_terms(title: str) -> list[str]:
@@ -924,17 +1060,17 @@ def sanitize_keywords(raw_keywords: Any, title: str = "") -> list[str]:
     deduped: list[str] = []
     seen: set[str] = set()
     for keyword in candidates:
-        normalized = normalize_keyword(keyword)
+        cleaned = clean_keyword_display(keyword)
+        cleaned = strip_specific_locations(cleaned)
+        cleaned = strip_non_ascii_text(cleaned)
+        normalized = normalize_keyword(cleaned)
         if not normalized:
             continue
-        if keyword_is_disallowed(normalized, keyword):
+        if keyword_is_disallowed(normalized, cleaned):
             continue
         if normalized in seen:
             continue
         seen.add(normalized)
-        cleaned = clean_keyword_display(keyword)
-        if not cleaned:
-            continue
         deduped.append(cleaned)
 
     prioritized = prioritize_title_terms(deduped, title)
@@ -952,7 +1088,7 @@ def validate_row(metadata: dict[str, Any], image_path: Path) -> RowData:
         raise ValidationError("source file does not exist")
 
     raw_title = metadata.get("title", "")
-    title = raw_title.strip() if isinstance(raw_title, str) else ""
+    title = sanitize_title_text(raw_title)
     if not title:
         raise ValidationError("title is empty")
     if "," in title:

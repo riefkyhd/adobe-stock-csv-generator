@@ -29,6 +29,7 @@ Rules enforced by the CLI:
 - `Title` required, no commas, max length guard.
 - `Keywords` required; auto-cleaned by normalization, deduplicated, filtered for compliance, and capped at 49.
 - Keyword targeting follows Adobe best practice: balanced `20-30` when justified, minimum accepted `15` after cleanup.
+- Place names are generalized by default (avoid specific city/country names unless externally verified).
 - Category can be delegated to a separate LM Studio model (default `google/gemma-3-4b`) for better classification stability.
 - `Category` must be integer `1..21`.
 - `Releases` must be blank unless explicitly verified.

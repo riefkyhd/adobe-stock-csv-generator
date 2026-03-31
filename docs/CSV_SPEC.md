@@ -75,6 +75,7 @@ Rules:
 - Duplicates are automatically removed after normalization (trim/lower/space-fold)
 - Major title concepts should be present in top keywords when relevant
 - Remove technical/file metadata and trademark/IP terms
+- Avoid specific city/country/place names unless externally verified; keep wording general
 - No technical metadata
 - No keyword stuffing
 - Avoid unnecessary singular/plural variants

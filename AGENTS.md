@@ -39,6 +39,7 @@ Analyze each image file and write one Adobe Stock CSV row for it using this exac
 13. Keep keywords ordered from most important to least important.
 14. Use **49 keywords max**.
 15. Use numeric category values only.
+16. Avoid specific city/country/place names unless externally verified; use general location wording.
 
 ## CSV constraints
 
@@ -55,6 +56,7 @@ Analyze each image file and write one Adobe Stock CSV row for it using this exac
 - Hard stop at 200 characters if needed by local template compatibility
 - No commas
 - No keyword stuffing
+- Avoid specific city/country/place names unless externally verified
 
 ## Keyword rules
 
