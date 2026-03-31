@@ -1,101 +1,58 @@
 # Adobe Stock CSV Generator
 
-A resumable local CLI that scans image files and builds Adobe Stock upload CSV metadata with a workflow designed for safety and restartability.
+A local tool that helps you create Adobe Stock CSV metadata from your photos, one image at a time, with safe resume behavior.
 
-## Why This Repo
+## Who This Is For
 
-This project focuses on workflow safety, not one-shot AI generation:
+This README is written for photographers who are not deeply technical.
 
-- Row-by-row processing: `analyze 1 image -> validate -> append 1 row -> flush -> continue`
-- Resume/recovery guarantees: reruns skip filenames already in CSV
-- Strict validation before write: title/keywords/category/release checks enforced
-- Review queue for uncertain/invalid rows: failures go to `review_needed.csv` without stopping batch
-- Benchmark visibility: run-level latency/throughput stats in `progress.json` and `run.log`
-- Deterministic scan order for reproducible reruns
+If you can:
+- open LM Studio,
+- open Terminal,
+- copy-paste a command,
 
-## What This Repo Does Not Do
+you can use this project.
 
-- It does **not** guarantee perfect metadata accuracy.
-- It does **not** guarantee perfect category assignment for every image.
-- It does **not** replace human review before Adobe submission.
-- It does **not** bypass Adobe policy requirements.
+## Beginner Quick Start (Recommended)
 
-Human review is still expected for final acceptance quality.
+This path uses **LM Studio** and does **not** require an OpenAI API key.
 
-## Project Maturity
+### 1. Before you start
 
-Current maturity signals:
+You need:
+- macOS/Linux
+- Python 3.10+
+- LM Studio installed
+- A vision model loaded in LM Studio (recommended: `qwen/qwen3-vl-8b`)
+- Your images inside `Portfolio/`
 
-- Unit tests for resume, validation, collisions, fallback behavior, and CSV structure checks
-- CI runs tests plus packaging/install smoke checks
-- Local+packaged CLI entry points supported
-- Strict Adobe CSV contract enforcement
-
-## CSV Contract
-
-Header is always:
-
-```csv
-Filename,Title,Keywords,Category,Releases
-```
-
-Rules enforced by the CLI:
-
-- UTF-8 CSV, comma delimiter, standard quoting, LF newlines
-- `Title` required, no commas, max length guard
-- `Keywords` cleaned/deduplicated/filtered and capped at 49
-- Category must be numeric `1..21`
-- `Releases` blank unless explicitly verified
-
-## Installation
-
-### Option A: Local install with pip
-
-```bash
-python3 -m pip install .
-```
-
-Then run:
-
-```bash
-adobe-stock-csv --help
-```
-
-### Option B: Isolated install with pipx (recommended for CLI usage)
-
-```bash
-pipx install .
-```
-
-Then run:
-
-```bash
-adobe-stock-csv --help
-```
-
-## Backward-Compatible Direct Script Usage
-
-Direct script execution remains supported:
-
-```bash
-python3 src/adobe_stock_csv_cli.py --help
-```
-
-## Quick Start (LM Studio default)
+### 2. Start LM Studio
 
 1. Open LM Studio.
-2. Load a vision-capable model (recommended primary: `qwen/qwen3-vl-8b`).
-3. Start Local Server (`http://127.0.0.1:1234`).
-4. Verify:
+2. Load a vision model (for example `qwen/qwen3-vl-8b`).
+3. Start Local Server.
+4. Confirm it is reachable at `http://127.0.0.1:1234`.
+
+Optional check:
 
 ```bash
 curl http://127.0.0.1:1234/v1/models
 ```
 
-Smoke test:
+### 3. Open Terminal in this project folder
+
+Project folder example:
+
+```text
+/Users/administrator/Documents/Kiki/adobe_stock_csv_codex_kit
+```
+
+### 4. Run a small smoke test first (5 images)
+
+Copy-paste:
 
 ```bash
-adobe-stock-csv \
+python3 src/adobe_stock_csv_cli.py \
   --backend lmstudio \
   --lmstudio-host http://127.0.0.1:1234 \
   --lmstudio-model qwen/qwen3-vl-8b \
@@ -106,10 +63,12 @@ adobe-stock-csv \
   --limit 5
 ```
 
-Full run:
+### 5. Run the full batch
+
+After smoke test looks good:
 
 ```bash
-adobe-stock-csv \
+python3 src/adobe_stock_csv_cli.py \
   --backend lmstudio \
   --lmstudio-host http://127.0.0.1:1234 \
   --lmstudio-model qwen/qwen3-vl-8b \
@@ -119,39 +78,113 @@ adobe-stock-csv \
   --output-dir output/lmstudio/qwen-qwen3-vl-8b
 ```
 
-## Lightweight Fixture for Contributor Validation
+## What Happens During a Run
 
-A tiny fixture is included at `fixtures/minimal/` for onboarding and plumbing checks.
+For each image, the tool does this safely:
 
-Example:
+1. Analyze 1 image
+2. Validate metadata
+3. Append exactly 1 CSV row
+4. Flush to disk immediately
+5. Continue
+
+If something fails for one image, the batch continues.
+
+## Resume and Recovery
+
+You can stop and run again anytime.
+
+- Already processed filenames are skipped.
+- The tool does not restart from zero.
+- Failed/uncertain files are logged for manual review.
+
+## Where Output Files Are
+
+Inside your selected `--output-dir`:
+
+- `adobe_stock_upload.csv` (main upload CSV)
+- `review_needed.csv` (items needing manual review)
+- `progress.json` (run counters and benchmark summary)
+- `run.log` (detailed run events)
+
+## Output Example
+
+Sample output view:
+
+![Output Example](docs/images/output-example.png)
+
+## Quick Quality Check (CSV structure)
 
 ```bash
-adobe-stock-csv \
-  --portfolio-dir fixtures/minimal \
-  --output-dir /tmp/adobe-stock-csv-fixture-run \
-  --limit 1 \
-  --dry-run
-```
-
-This is for wiring validation only. Use real image sets for metadata quality evaluation.
-
-## Validate Existing CSV Structure
-
-```bash
-adobe-stock-csv \
+python3 src/adobe_stock_csv_cli.py \
   --output-dir output/lmstudio/qwen-qwen3-vl-8b \
   --validate-only \
   --validate-lines 5
 ```
 
-## Outputs
+## What This Tool Is Good At
 
-Generated under selected output dir:
+- Safe row-by-row writing
+- Resume support for long runs
+- Strict CSV validation before write
+- Review queue for uncertain rows
+- Benchmark visibility (speed and latency)
 
-- `adobe_stock_upload.csv`
-- `review_needed.csv`
-- `progress.json`
-- `run.log`
+## What This Tool Does Not Guarantee
+
+- Perfect title/keyword/category accuracy for every image
+- Zero manual review effort
+- Guaranteed Adobe acceptance for every asset
+
+Human review is still expected before final Adobe submission.
+
+## Basic Troubleshooting (Plain Language)
+
+### "LM Studio quit unexpectedly"
+
+- Reopen LM Studio manually.
+- Make sure a model is loaded.
+- Make sure Local Server is running.
+- Re-run the same command; resume will skip completed files.
+
+### "No output written"
+
+- Check if model/server is running.
+- Check `review_needed.csv` for reasons.
+- Check `run.log` for error details.
+
+### "Wrong categories on some images"
+
+- This can happen with AI models.
+- Use `review_needed.csv` and your manual pass before upload.
+
+## Advanced / Developer Section
+
+## Installation (packaged command)
+
+### Option A: Local install with pip
+
+```bash
+python3 -m pip install .
+```
+
+Then use:
+
+```bash
+adobe-stock-csv --help
+```
+
+### Option B: Isolated install with pipx
+
+```bash
+pipx install .
+```
+
+Then use:
+
+```bash
+adobe-stock-csv --help
+```
 
 ## Optional Backends
 
@@ -159,15 +192,41 @@ Generated under selected output dir:
 - `ollama`
 - `openai`
 
+## CSV Contract
+
+Header is always:
+
+```csv
+Filename,Title,Keywords,Category,Releases
+```
+
+Validation includes:
+- UTF-8, comma-delimited, standard quoting, LF newlines
+- Required title and keywords
+- Category numeric `1..21`
+- `Releases` blank unless explicitly verified
+
 ## Testing
 
 ```bash
 python3 -m unittest -q tests/test_adobe_stock_csv_cli.py
 ```
 
+## Lightweight Contributor Fixture
+
+A tiny fixture is provided for wiring checks:
+
+```bash
+python3 src/adobe_stock_csv_cli.py \
+  --portfolio-dir fixtures/minimal \
+  --output-dir /tmp/adobe-stock-csv-fixture-run \
+  --limit 1 \
+  --dry-run
+```
+
 ## Internal Maintainer Docs
 
-These remain public but are maintainer/internal workflow aids, not end-user runtime requirements:
+These remain public but are internal workflow aids:
 
 - `AGENTS.md`
 - `prompts/`
